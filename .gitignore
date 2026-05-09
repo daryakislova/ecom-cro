@@ -1,0 +1,9 @@
+# Outputs from running /cro-deck (per-client deliverables)
+outputs/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/

@@ -1,0 +1,17 @@
+{
+  "name": "ecom-cro-marketplace",
+  "owner": {
+    "name": "daryakislova"
+  },
+  "plugins": [
+    {
+      "name": "ecom-cro",
+      "source": "./plugins/ecom-cro",
+      "description": "Build a CRO recommendation deck end-to-end. Parses a client brief, audits the website, generates ICE-scored audience-aligned recommendations grounded in UX heuristics, validates feasibility, captures screenshots, and produces a complete deck brief ready to hand off to Claude Design. Brand-neutral — asks each user for their own style at runtime.",
+      "version": "0.2.0",
+      "author": {
+        "name": "daryakislova"
+      }
+    }
+  ]
+}
