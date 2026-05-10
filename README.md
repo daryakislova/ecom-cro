@@ -1,6 +1,6 @@
 # Ecom CRO Plugin
 
-End-to-end CRO recommendation deck builder for ecom clients. From client brief to a ready-for-Claude-Design output package, in one slash command.
+End-to-end CRO recommendation builder for ecom clients. From client brief to an interactive HTML prototype your client can play with — plus optional .pptx handoff package.
 
 ## What it does
 
@@ -12,10 +12,10 @@ You run `/cro-deck` and the workflow walks Claude through:
 3. **Ideation** — generates ICE-scored, hypothesis-formatted recommendations with expected lift ranges and full metadata
 4. **Self-validation** — three independent passes: audience fit, competitor scan (advisory not gating), Ship/Test/Research-first classification
 5. **Confirmation** — you approve / edit the rec list
-6. **Screenshots** — captures pristine iPhone 16 Pro screenshots of current state + competitor references
-7. **Deck brief** — writes `deck-brief.md`, `claude-design-prompt.txt`, `metadata.json`, and a `screenshots/` folder ready to hand off to Claude Design
+6. **Interactive HTML prototype** — builds a near-1:1 recreation of the client's key pages (PDP, PLP, category landing, homepage, footer) with toggleable rec controls so you can flip each fix on/off and watch the design compound toward the Suggested state. Built from the client's actual DOM when possible; falls back to user-provided phone screenshots only if the site is unreachable.
+7. **Deck brief + handoff package** — writes `prototype.html`, `prototype-rec-map.json`, `deck-brief.md`, `claude-design-prompt.txt`, `metadata.json` — share the prototype URL directly with the client OR hand the package to Claude Design for an optional .pptx.
 
-Output: a complete folder you attach to a new Claude Design session. Claude Design produces the final `.pptx` styled in your brand.
+Primary output: an interactive HTML prototype the client can interact with directly. Optional output: static .pptx via Claude Design hand-off (less reliable; recommended only if the client specifically expects a deck).
 
 ## Folder structure (after install)
 

@@ -12,7 +12,7 @@ You are producing a CRO recommendation deck for an ecom client. Walk through thi
 - This is for an ecom client. PDPs and PLPs are the most leveraged pages. Cart drawer matters. Standard Shopify checkout is low-leverage; only audit it deeply if the user flagged Shopify Plus + Checkout Extensibility, or asks for it.
 - Mobile-first by default unless the user picks web in Step 2.
 - The plugin ships with NO brand assets — every run, you ask the user to provide (or describe) their style. Then you save a per-client style profile to `outputs/<client-slug>/style-profile.json` and treat it as law for the rest of that run.
-- The final deliverable is NOT the .pptx. It is a brief + screenshots package handed off to Claude Design.
+- **The primary deliverable is an interactive HTML prototype** (`prototype.html`) that recreates the client's current site at near-1:1 fidelity with toggleable rec controls. The user can share this URL directly with the client. The `.pptx` is an optional follow-on artifact via Claude Design hand-off; previous attempts with Claude Design have consistently failed at photoreal mockup synthesis, so HTML is preferred.
 - Every recommendation must cite at least one heuristic by name from the `cro-heuristics` skill. Read it before generating recs.
 
 All output files for one deck go to `outputs/<client-slug>/` where `<client-slug>` is the client name in lowercase with hyphens.
@@ -368,25 +368,107 @@ Ask: "Approve this list, or want to drop / edit / add any?" Wait for explicit ap
 
 ---
 
-## Step 6 — Screenshot capture
+## Step 6 — Build interactive HTML prototype
 
-For each approved rec, capture:
+Build a single-file HTML interactive prototype that recreates the client's current key pages (PDP, PLP, category landing, homepage, footer) at near-1:1 fidelity, with toggleable rec controls. The user can flip each rec on/off and watch the design compound toward the Suggested state.
 
-**Current state:** mobile viewport (logical 402×874, 3x density → 1206×2622 PNG), pristine. Close cookie banners, popups, chat. Wait for layout settle. Scroll to where the targeted element is fully visible AND surrounding context is preserved.
+This artifact replaces the static "Current + Suggested screenshot pair" pattern that consistently fails downstream. It is the primary deliverable.
 
-**Competitor reference:** same dimensions, of the competitor implementing the pattern (when applicable — `best_competitor_url_for_screenshot` from Step 4b). Crop tightly around the relevant section if needed.
+### 6.0 — Two-path source-of-truth strategy
 
-**Mockup spec (written, not generated):** describe exactly which element to change and how, for Claude Design to execute. Include bounding-box hint within the Current screenshot.
+**ALWAYS try Path A first. Only fall back to Path B if Path A fails.**
 
-**Asymmetric layouts (per style profile):**
-- Purely additive recs (no current state) → only competitor reference
-- Removal recs → only Current
+#### Path A — Build from the client's actual DOM (PREFERRED)
 
-**Naming:** `outputs/<client-slug>/screenshots/rec-NN-<type>.png` where NN is two-digit padded (01, 02, ...) and type is `current` or `competitor`. Multiple current shots use suffixes: `rec-04-current-a.png`.
+Use browser tools to visit each key page on the client site. For each page:
 
-**Quality gate:** Every approved rec has its required screenshot(s); no cookie banners or popups in any image; targeted element is clearly visible.
+1. Navigate (mobile viewport — set width to narrow or use `?country=US` if geo-redirect interferes)
+2. Wait for full layout settle (5–8s, scroll page top→bottom→top to trigger lazy-load)
+3. Close cookie banners, chat widgets, accessibility overlays
+4. Extract the DOM structure using `read_page` (accessibility tree) AND `javascript_tool` to inspect computed styles, font sizes, colors, padding, section ordering. Pull real content: product titles, brand labels, prices, variant labels, swatches, description text, footer accordions.
+5. Note the EXACT visual quirks the audit found: oversized header wordmark, mixed text+swatch selectors, dropdowns instead of chips, empty bordered circle swatches, sticky bottom popup behavior, etc. These are precisely what the rec toggles will fix in the Suggested state — they must be reproduced in the Current state.
 
-**Failure handling:** Page fails / anti-bot blocks → ask user to provide screenshot themselves; preserve naming convention.
+Recreate each page in HTML as a phone-frame mockup, ~420px wide × ~840px tall, with:
+- Sticky chrome (URL bar) at top
+- Sticky page header below (so the header behavior matches reality — e.g. for Fig the huge wordmark sticks during scroll)
+- Scrollable content area
+- Sticky bottom recommendation popup if the client uses one (Shopify themes commonly do)
+
+#### Path B — Fallback: ask the user for phone screenshots
+
+If Path A fails (Cloudflare-blocked, geofenced, auth-walled, anti-bot, browser tool offline, or the site's responsive behavior cannot be reliably reproduced from DOM inspection), tell the user the exact pages and scroll states you need, and ask them to capture phone screenshots. Then build the HTML using their screenshots as visual reference (and optionally as base layer for image-heavy areas via `<img>`).
+
+Before falling back, state explicitly what failed and why. Do NOT default to asking for screenshots without first attempting Path A.
+
+### 6.1 — Pages to recreate
+
+Minimum set (always):
+- 1 PDP showing the most complex variant pattern audited (mixed swatches, huge stack, or dropdowns — whichever the client has)
+- 1 PLP showing the existing product-card pattern
+- 1 category landing page (the top-level destination of one main nav item)
+- 1 homepage view (top of page, hero + first section)
+
+Add for richer prototypes:
+- Additional PDP variants if the client has multiple distinct patterns (e.g. PDP A for mixed swatches + PDP B for dropdowns)
+- A scrolled-down PDP variant showing reviews / bundle / footer
+
+### 6.2 — Toggle controls
+
+For each approved rec from Step 5, define a toggle key (`r1`, `r2`, ... in rec_index order). Each toggle, when ON, modifies the rendered page to apply that rec's change. Toggles compound — flipping multiple ON stacks their effects.
+
+For each rec, document in `outputs/<client-slug>/prototype-rec-map.json`:
+
+```json
+[
+  {
+    "rec_index": 1,
+    "toggle_key": "r1",
+    "applies_to_pages": ["pdpA","pdpB","pdpC","plp","cat","home"],
+    "suggested_view_setup": {
+      "page_tab": "pdpA",
+      "toggles_on": ["r1"]
+    },
+    "compounded_view_setup": {
+      "page_tab": "pdpA",
+      "toggles_on": ["r1","r4","r7"],
+      "note": "By slide N, the Suggested view should show this rec plus all prior compounded fixes."
+    },
+    "label_in_ui": "Compact header"
+  }
+]
+```
+
+The `suggested_view_setup` is for the isolated demonstration of that single rec. The `compounded_view_setup` is the cumulative state when the deck reader has progressed through all prior recs (the deck's compound-storytelling rule).
+
+### 6.3 — Recommended UI layout for the prototype
+
+- Top of widget: tab row for page selection (PDP A / PDP B / PLP / Cat landing / Homepage / etc.)
+- Below tabs: control panel listing the toggles applicable to the current page. Each toggle is a labeled pill with a state dot. "Reset all" and "Apply all" buttons. Counter "N / Total on".
+- Below controls: the phone frame, ~420px wide, with a fixed chrome and scrollable inner content area. Re-renders on every toggle change.
+
+### 6.4 — Fidelity standards
+
+The prototype must be honest. Older audiences and clients reviewing the deck need to recognize their own site immediately.
+
+- Use real text content from the audit (real product names, real brand labels, real prices, real variant labels).
+- Use real fonts where possible — fall back to system serif/sans-serif if the brand font can't be loaded from a CDN.
+- Reproduce visual quirks: oversized wordmarks, sticky behaviors, sparse vs dense layouts, color palettes, button styling. The deck reader should look at the "Current" state and say "yes that's our site."
+- For images, use SOLID FILL or subtle CSS gradients matching the typical product photography palette (off-white, beige, soft gray). Do not attempt to embed real product photos — they bloat the file and rarely render reliably.
+- For the Suggested state, apply each rec's targeted change ONLY. Do not redesign surrounding UI.
+
+### 6.5 — Output files
+
+- `outputs/<client-slug>/prototype.html` — single-file, all CSS+JS inline. Self-contained. Openable in any browser.
+- `outputs/<client-slug>/prototype-rec-map.json` — per-rec toggle mapping (see schema in 6.2).
+
+### 6.6 — Quality gate
+
+- All approved recs from Step 5 are mapped to toggles
+- Every page tab renders cleanly with all toggles OFF (Current state)
+- Every toggle visibly modifies the rendering when flipped ON
+- "Apply all" on each page tab produces a coherent Suggested state — no broken layout, no overlap, no missing content
+- Honest about audited quirks (e.g. sticky header, sticky bottom popup, exact swatch/dropdown patterns)
+- File is under 200KB (no embedded images, no large fonts; CSS+JS+text only)
 
 ---
 
@@ -471,13 +553,13 @@ For each rec, render this layout:
   - **Expected lift:** {{expected_lift}}
   - **Supporting stat:** "{{stat}}" — [{{source}}]({{source_url}}) (omit if null)
 - **Right zone:**
-  - "Current" label (red, bold) and "Suggested" label (green, bold) above the screenshots
+  - "Current" label (red, bold) and "Suggested" label (green, bold) above the two phone frames
   - Vertical dashed separator between the two sides
-  - Screenshots: iPhone 16 Pro size (~1.95" × 4.3"), thin device frame
+  - Phone frames: iPhone 16 Pro aspect (~1.95" × 4.3"), thin device frame
+  - **Current** = screenshot of `prototype.html`, page tab from `prototype-rec-map.json[rec].suggested_view_setup.page_tab`, all toggles OFF
+  - **Suggested** = screenshot of `prototype.html`, same page tab, with toggles from `prototype-rec-map.json[rec].compounded_view_setup.toggles_on` flipped ON (this is the compounded view — by slide N, the Suggested has this rec PLUS all prior recs visible together)
   - Layout type: symmetric | additive-only | removal-only
-  - Current path: `screenshots/rec-NN-current.png`
-  - Suggested mockup spec: <verbatim mockup_spec>
-  - Competitor reference: `screenshots/rec-NN-competitor.png` — caption "as seen on {{competitor.com}}"
+  - Competitor reference (optional): small inset thumbnail with caption "as seen on {{competitor.com}}" if a competitor implements the pattern visibly
 - **Page number:** bottom-right per style profile
 
 <repeat for every rec, in deck order>
@@ -498,20 +580,29 @@ I'm handing off a CRO deck for {{CLIENT_NAME}}. Please produce the .pptx followi
 
 Attached:
 - deck-brief.md — master instructions, including embedded style rules and per-slide content
-- screenshots/ — folder with all current + competitor reference images, named rec-NN-<type>.png
-- (optional) any logo or brand asset files referenced in the style profile
+- prototype.html — interactive HTML prototype recreating the client's current site with rec toggles. This is the source of truth for every Current and Suggested screen — do NOT regenerate or mockup anything from scratch.
+- prototype-rec-map.json — per-rec mapping of which prototype page tab + which toggles to flip ON for each rec's Current and Suggested view
+- recommendations-validated.json — full structured rec data
+- style-profile.json — visual style law
+- (optional) logo or other brand assets
 
 Critical rules:
 1. The style profile embedded in deck-brief.md is law — do not deviate.
-2. For each "Suggested" mockup, modify ONLY the specific element described in the mockup spec for that slide. Keep all surrounding UI pixel-identical to the "Current" screenshot — same fonts, colors, spacing, status bar, scroll position. Do not regenerate the full UI.
-3. For purely additive recs, render only the Suggested side. For removal recs, render only the Current side.
-4. Each rec slide includes a small competitor reference thumbnail with caption "as seen on <competitor.com>" — sourced from the competitor screenshot file referenced in the brief.
-5. The closing slide lists all unique competitor URLs referenced + the comments/feedback link.
+2. For each slide, screenshot the prototype with the specified toggle states (per prototype-rec-map.json):
+   - Current = the prototype page tab, all toggles OFF
+   - Suggested = the same page tab, with this rec's compounded_view_setup.toggles_on flipped ON
+3. Compose the two screenshots into the slide's right zone with Current/Suggested labels and dashed separator.
+4. Do NOT redraw or regenerate UI. Use only the prototype's rendered output as the visual source.
+5. For purely additive recs, you may show only the Suggested side. For removal recs, only the Current side.
+6. Font: install the brand font (per style profile) on the build environment before generating. If embedding fails, fall back to Helvetica Neue or Calibri. NEVER Arial.
+7. The closing slide lists all competitor URLs referenced in the rec spec + the comments/feedback link.
 
 Output: a single .pptx file named "{{CLIENT_NAME}} _ Website Recommendations.pptx".
 
-Before finalizing, do a visual QA pass: render every slide as an image and check for overflow, mis-aligned columns, broken page numbers, and any place where the "Suggested" mockup unintentionally changed something other than the targeted element.
+Before finalizing, do a visual QA pass: render every slide as an image and check for left-rail text overflow, mis-aligned columns, broken page numbers, font fallback to Arial, and any prototype screenshots that show the wrong toggle state for the slide.
 ```
+
+**Alternative (recommended):** the user may choose to skip the .pptx entirely and share `prototype.html` directly with the client. The HTML is a more honest, more interactive artifact than any static deck. Tell the user this option in Step 8.
 
 ### File 3 — `metadata.json`
 
@@ -519,25 +610,43 @@ Full structured rec data (every field from Step 3 + validator labels from Step 4
 
 ### Quality gate before delivery
 
-- All three files present in `outputs/<client-slug>/`
-- Every rec slide has the full schema filled (no nulls in required fields)
-- Every screenshot path in the brief actually exists on disk
-- Sources slide lists every competitor URL referenced
-- Style rules section is pasted from style-profile.json (not paraphrased)
-- Mockup specs explicitly state "modify ONLY X" for each rec
+- All files present in `outputs/<client-slug>/`: `prototype.html`, `prototype-rec-map.json`, `deck-brief.md`, `claude-design-prompt.txt`, `metadata.json`, `recommendations-validated.json`, `style-profile.json`
+- Every rec slide schema is filled (no nulls in required fields)
+- Every rec in `prototype-rec-map.json` has a `toggle_key`, `suggested_view_setup`, and `compounded_view_setup`
+- `prototype.html` opens cleanly in a browser, all tabs render, all toggles work, "Apply all" produces a coherent Suggested state per page
+- Sources / closing slide in the brief lists every competitor URL referenced
+- Style rules section is pasted from `style-profile.json` (not paraphrased)
 - Page numbers are sequential
-- The deck reflects the user's own brand from Step 0
+- The prototype and deck reflect the user's own brand from Step 0
 
 ---
 
 ## Step 8 — Hand-off
 
-Tell the user exactly what to do next:
+Present the user with both delivery paths and let them choose.
 
-1. Open the output folder (provide a `computer://` link)
-2. Start a new Claude Design session
-3. Attach: `deck-brief.md` + `screenshots/` folder + any brand assets the user provided in Step 0 (logo etc.)
-4. Paste the contents of `claude-design-prompt.txt`
-5. Claude Design produces the `.pptx`
+**Path A (recommended) — share the HTML prototype directly with the client:**
 
-Provide the `computer://` link to the output folder so the user can open it directly.
+1. Open the output folder (provide `computer://` link).
+2. Tell the user the primary deliverable is `prototype.html`. They can:
+   - Open it in a browser to verify it looks right
+   - Share the file directly with the client, OR
+   - Host it via any static-file host (or just open from local) and share the URL
+3. Pair it with `recommendations-validated.json` (or convert to Notion / Google Doc) for the per-rec "why" content the deck would have shown in the left rail.
+4. Optional: walk the client through the toggles on a call so they can see the Current → Suggested transition live.
+
+This is the strongest deliverable. It's honest (no fake mockups), interactive (better than static slides), and recreate-able by anyone who opens the file. Previous CRO deck attempts via Claude Design have failed at photoreal mockup synthesis; the HTML prototype solves that by being the artifact itself.
+
+**Path B (optional) — produce a .pptx via Claude Design:**
+
+If the client expects a static deck:
+
+1. Open the output folder.
+2. Start a new Claude Design session.
+3. Attach: `prototype.html`, `prototype-rec-map.json`, `deck-brief.md`, `recommendations-validated.json`, `style-profile.json`, any brand assets.
+4. Paste the contents of `claude-design-prompt.txt`.
+5. Claude Design opens the prototype, screenshots each toggle state per `prototype-rec-map.json`, and composes the .pptx.
+
+Note: Claude Design's reliability on this workflow has been mixed. If it fails, fall back to manually screenshotting the prototype toggle states and assembling a deck in PowerPoint/Keynote (about an hour of work for 12–15 recs).
+
+Provide the `computer://` link to the output folder so the user can pick a path.

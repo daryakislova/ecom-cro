@@ -1,7 +1,7 @@
 {
   "name": "ecom-cro",
-  "version": "0.2.0",
-  "description": "Build a CRO recommendation deck end-to-end. Parses a client brief, audits the website, generates ICE-scored audience-aligned recommendations grounded in UX heuristics, validates feasibility, captures screenshots, and produces a complete deck brief ready to hand off to Claude Design. Brand-neutral — asks each user for their own style at runtime.",
+  "version": "0.3.0",
+  "description": "Build a CRO recommendation package end-to-end. Parses a client brief, audits the website, generates ICE-scored audience-aligned recommendations grounded in UX heuristics, validates feasibility, then builds an interactive HTML prototype recreating the client's site with toggleable rec controls — plus optional deck handoff package. Brand-neutral — asks each user for their own style at runtime.",
   "author": {
     "name": "daryakislova"
   },
