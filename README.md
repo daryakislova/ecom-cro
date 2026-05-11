@@ -12,10 +12,12 @@ You run `/cro-deck` and the workflow walks Claude through:
 3. **Ideation** — generates ICE-scored, hypothesis-formatted recommendations with expected lift ranges and full metadata
 4. **Self-validation** — three independent passes: audience fit, competitor scan (advisory not gating), Ship/Test/Research-first classification
 5. **Confirmation** — you approve / edit the rec list
-6. **Interactive HTML prototype** — builds a near-1:1 recreation of the client's key pages (PDP, PLP, category landing, homepage, footer) with toggleable rec controls so you can flip each fix on/off and watch the design compound toward the Suggested state. Built from the client's actual DOM when possible; falls back to user-provided phone screenshots only if the site is unreachable.
+6. **Interactive HTML prototype** — builds a near-1:1 recreation of the client's key pages (PDP, PLP, category landing, homepage, footer) with toggleable rec controls so you can flip each fix on/off and watch the design compound toward the Suggested state. **DOM-first**: opens the live site in a browser tab, extracts real structure and computed styles via `read_page` + `javascript_tool`, and recreates each page from that data. Phone screenshots are a fallback only — used when Cloudflare/anti-bot blocks the site, the page is geofenced or auth-walled, or responsive behavior can't be reproduced from DOM inspection. The plugin always tries the live site first.
 7. **Deck brief + handoff package** — writes `prototype.html`, `prototype-rec-map.json`, `deck-brief.md`, `claude-design-prompt.txt`, `metadata.json` — share the prototype URL directly with the client OR hand the package to Claude Design for an optional .pptx.
+8. **Hand-off** — Path A (recommended): share `prototype.html` directly with the client. Path B (optional): generate `.pptx` via Claude Design.
+9. **Per-rec text export (on demand)** — at any point after Step 5 the user can ask for the rec text (Recommendation / Why / Impact / Expected lift / Heuristics / ICE) either pasted into chat (single rec, slide-format) or saved to `recommendations.md` (full set). Source: `recommendations-validated.json`, verbatim.
 
-Primary output: an interactive HTML prototype the client can interact with directly. Optional output: static .pptx via Claude Design hand-off (less reliable; recommended only if the client specifically expects a deck).
+Primary output: an interactive HTML prototype the client can interact with directly. Optional output: static .pptx via Claude Design hand-off (less reliable; recommended only if the client specifically expects a deck). Either path can be paired with the per-rec text export.
 
 ## Folder structure (after install)
 
@@ -23,11 +25,16 @@ Primary output: an interactive HTML prototype the client can interact with direc
 ecom-cro/
 ├── .claude-plugin/plugin.json     ← manifest
 ├── commands/cro-deck.md           ← /cro-deck — the entire workflow
+├── templates/
+│   ├── README.md                  ← when to use which template
+│   ├── prototype-widget.html      ← full-site recreation with per-rec toggles
+│   └── current-vs-suggested.html  ← element-level redesign comparison
 └── skills/
-    └── cro-heuristics/SKILL.md    ← reference library: NN/g + Cialdini + ecom UX patterns
+    ├── cro-heuristics/SKILL.md    ← reference library: NN/g + Cialdini + ecom UX patterns
+    └── popup-copy/SKILL.md        ← luxury 45+ email-popup copy & design principles
 ```
 
-Three files. The slash command owns the workflow end-to-end; the heuristic library is a separate file because it's a reference you'll edit independently (adding new audience signals, new patterns) without touching the workflow logic. **No brand assets ship with the plugin** — every user supplies their own at runtime.
+The slash command owns the workflow end-to-end. The reference libraries (`cro-heuristics`, `popup-copy`) are separate files because they're references you'll edit independently — adding new audience signals, new patterns, new copy principles — without touching the workflow logic. The `templates/` folder holds two reusable HTML widget patterns the `/cro-deck` workflow plugs into. **No brand assets ship with the plugin** — every user supplies their own at runtime.
 
 ## Install
 
@@ -59,6 +66,8 @@ Want to update something across all future decks?
 
 - **Workflow** (steps, validators, mix rules, slide layout, brief format) → edit `commands/cro-deck.md`
 - **Heuristic library** (add audience signals, new patterns) → edit `skills/cro-heuristics/SKILL.md`
+- **Popup / newsletter copy rules** (audience-tuned copy + design principles) → edit `skills/popup-copy/SKILL.md`
+- **Widget templates** (prototype scaffold, current-vs-suggested scaffold) → edit `templates/*.html`
 
 Brand style is captured per session at runtime — no plugin file to edit.
 

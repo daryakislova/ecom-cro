@@ -374,6 +374,16 @@ Build a single-file HTML interactive prototype that recreates the client's curre
 
 This artifact replaces the static "Current + Suggested screenshot pair" pattern that consistently fails downstream. It is the primary deliverable.
 
+### Templates to start from
+
+Two reusable scaffolds live in `templates/` — read them before writing widget code from scratch:
+
+- **`templates/prototype-widget.html`** — full-site recreation with per-rec toggles + tabbed page switcher (PDP A/B/C, PLP, Category landing, Homepage). Phone-wrap 294×588px outer, inner phone 420×840px scaled `0.7`, square corners, sticky popup wired to IntersectionObserver. Use this for the primary Step 6 deliverable. Replace `{{CLIENT_*}}` placeholders, plug in your six page-render functions, render via `mcp__visualize__show_widget`.
+
+- **`templates/current-vs-suggested.html`** — element-level redesign comparison (single popup, banner, or module). One toggle at top: Current / Suggested. Desktop + Mobile views stacked, both update together. Use this when a single rec needs its own focused mockup (e.g. the email-popup redesign rec). The compound prototype is overkill for single-element comparisons.
+
+Read `templates/README.md` for the full how-to-use guide.
+
 ### 6.0 — Two-path source-of-truth strategy
 
 **ALWAYS try Path A first. Only fall back to Path B if Path A fails.**
@@ -650,3 +660,92 @@ If the client expects a static deck:
 Note: Claude Design's reliability on this workflow has been mixed. If it fails, fall back to manually screenshotting the prototype toggle states and assembling a deck in PowerPoint/Keynote (about an hour of work for 12–15 recs).
 
 Provide the `computer://` link to the output folder so the user can pick a path.
+
+---
+
+## Step 9 — Per-rec text export (on demand)
+
+Independent deliverable the user can request at any point after Step 5 (rec confirmation). Produces the full per-rec copy — Recommendation, Why, Impact, Expected lift, Supporting stat, Implementation note, Heuristics, ICE — in the format the deck's left rail expects.
+
+This step exists because clients frequently want the text content separately from the prototype: to paste into Notion, build their own slide deck, hand to a copywriter, ticket as Asana cards, or review offline.
+
+### Two delivery modes — ask the user which they want
+
+**Mode A — Direct to chat**
+
+Format and paste the rec text into the chat response. Use this when:
+- The user is reviewing recs interactively
+- They want to copy-paste a single rec into another tool
+- They asked for the text in chat ("send me the copy for slide N")
+
+Format per rec:
+
+```
+**Slide N — [Title]**
+
+**Recommendation**
+[recommendation field — full prose]
+
+**Why**
+[why field — full prose]
+
+**Impact**
+- [impact_metrics bullet 1]
+- [impact_metrics bullet 2]
+- [impact_metrics bullet 3]
+
+**Expected lift**: [expected_lift]
+**Supporting stat**: [supporting_stat.stat] — [supporting_stat.source] ([supporting_stat.source_url])  ← omit this line if supporting_stat is null
+**Implementation**: [implementation_note]  ← omit if null
+**Heuristics**: [heuristics_cited joined by " · "]
+**ICE**: [impact] / [confidence] / [ease] ([total]) · [feasibility_label]
+**Competitor reference**: [competitor_url_for_reference]
+```
+
+If the user asks for multiple recs at once, render each as a separate block separated by `---`.
+
+**Mode B — To a markdown file**
+
+Write all recs to `outputs/<client-slug>/recommendations.md`. Use this when:
+- The user wants the full set as a deliverable file
+- They asked for a "file" / "document" / "export"
+- The deck is the final form but they want a structured text version alongside
+
+File structure:
+
+```markdown
+# [Client name] — CRO recommendations
+
+[N] recommendations · Generated [date]
+
+## Section 1 — UI/UX Recommendations
+
+### Slide 1 — [Title]
+[full per-rec block, same format as Mode A but without the surrounding bolding cues]
+
+### Slide 2 — [Title]
+...
+
+## Section 2 — Strategic Recommendations
+
+### Slide N — [Title]
+...
+
+## Sources
+- [competitor URL 1]
+- [competitor URL 2]
+...
+```
+
+After writing, share `computer://` link to `recommendations.md`.
+
+### How to choose
+
+Default to asking the user explicitly: "Do you want the rec text in chat, or saved to a file you can open?" One short clarifying question saves wasted output.
+
+If they ask for "all recs" / "the full list" / "a document," default to Mode B (file).
+If they ask for "the copy for slide N" / "rec X text" / "send me," default to Mode A (chat).
+
+### Source of truth
+
+All text content comes from `outputs/<client-slug>/recommendations-validated.json`. Do not paraphrase or rewrite the fields — copy them verbatim. If a field is empty or null, omit the corresponding line entirely rather than inventing content.

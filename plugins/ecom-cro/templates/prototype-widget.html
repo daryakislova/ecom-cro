@@ -1,0 +1,145 @@
+<!--
+  prototype-widget.html — reusable full-site recreation with per-rec toggles.
+
+  SOURCE-OF-TRUTH STRATEGY (read this before writing widget code):
+
+  This template is built to be populated FROM THE LIVE SITE — not from screenshots.
+  The agent MUST attempt the DOM-first path first:
+
+    Path A (PREFERRED) — Web scraping / DOM recreation:
+      1. Open the client's actual PDP / PLP / category / homepage URLs in a browser tab.
+      2. Use read_page + javascript_tool to extract computed styles (font sizes, colors,
+         padding), section ordering, real product titles, brand labels, prices, variant
+         selector patterns, swatch styles, accordion structure, sticky-popup behavior.
+      3. Recreate each page inside this template using the extracted structure. The
+         goal is near-1:1 fidelity to what a real visitor actually sees — including
+         the visual quirks the audit flagged (oversized wordmark, mixed text+swatch
+         selectors, empty bordered circles, dropdowns, "Choose options" popup, etc.).
+         Those quirks become the toggleable diffs in the Suggested state.
+
+    Path B (FALLBACK ONLY) — User-supplied screenshots:
+      Only fall back to asking for phone screenshots when Path A demonstrably fails
+      (Cloudflare-blocked, anti-bot, geofenced/auth-walled, browser tool offline,
+      responsive behavior unreproducible from DOM). When falling back, state
+      explicitly what failed and why. Do NOT default to "send me screenshots."
+
+  Placeholders to replace before rendering:
+    {{CLIENT_WORDMARK}}        — e.g. FIG<br/>LINENS<br/>AND<br/>HOME
+    {{CLIENT_WORDMARK_COMPACT}} — e.g. FIG LINENS
+    {{CLIENT_URL}}             — figlinensandhome.com
+    {{ANNOUNCE_FREE_SHIPPING}} — FREE SHIPPING ON ORDERS OVER $100! · Questions? Email info@figlinens.com
+    {{ANNOUNCE_SHOP_NEW}}     — Shop New Arrivals!
+    {{REC_LIST_JSON}}           — JSON of {key: {label, applies}} matching recommendations-validated.json
+    {{PRODUCT_TYPES_JSON}}       — for Shop by Category rail (Sheets / Duvets / Pillowcases / etc.)
+    {{PDP_A_HTML, PDP_B_HTML, PDP_C_HTML, PLP_HTML, CAT_HTML, HOME_HTML}} — page templates,
+                                  each generated from DOM extraction (Path A) or screenshot
+                                  reference (Path B).
+
+  Pattern: phone-wrap 294x588, inner phone 420x840 scaled 0.7, square corners.
+  Tabs across top switch pages. Pills below tabs toggle individual recs.
+  Each rec is boolean in state. Render rebuilds full page HTML on each toggle.
+  IntersectionObserver wires the sticky popup to scroll position (appears at Delivery, hides at Footer).
+-->
+
+<style>
+.fw { font-family: system-ui, -apple-system, sans-serif; }
+.fw .tabs { display: flex; gap: 6px; margin: 0 0 0.75rem; flex-wrap: wrap; }
+.fw .tab { background: transparent; border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 7px 11px; font-size: 12px; color: var(--color-text-secondary); cursor: pointer; }
+.fw .tab.active { background: var(--color-text-primary); color: var(--color-background-primary); border-color: var(--color-text-primary); }
+.fw .controls { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 12px 14px; margin: 0 0 0.75rem; }
+.fw .ctrls-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text-tertiary); margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+.fw .ctrls-title button { background: transparent; border: 0; font-size: 11px; color: var(--color-text-secondary); text-decoration: underline; cursor: pointer; padding: 0; }
+.fw .pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.fw .pill { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: 999px; padding: 6px 12px; font-size: 12px; cursor: pointer; color: var(--color-text-secondary); display: inline-flex; align-items: center; gap: 6px; }
+.fw .pill .dot { width: 8px; height: 8px; border-radius: 50%; background: #ddd; flex-shrink: 0; }
+.fw .pill.on { background: #e8f5e9; border-color: #4caf50; color: #1b5e20; }
+.fw .pill.on .dot { background: #4caf50; }
+.fw .stage { background: var(--color-background-secondary); border-radius: var(--border-radius-lg); padding: 0.75rem; display: flex; justify-content: center; }
+.fw .phone-wrap { width: 294px; height: 588px; overflow: hidden; }
+.fw .phone { width: 420px; height: 840px; background: #fff; border-radius: 0; border: 2px solid #1a1a1a; color: #000; display: flex; flex-direction: column; overflow: hidden; transform: scale(0.7); transform-origin: top left; }
+.fw .chrome { flex-shrink: 0; }
+.fw .scroll { flex: 1; overflow-y: auto; position: relative; }
+.fw .scroll::-webkit-scrollbar { width: 4px; }
+.fw .scroll::-webkit-scrollbar-thumb { background: #ccc; }
+.fw .ub { display: flex; align-items: center; gap: 10px; padding: 9px 14px; background: #f3f3f3; border-bottom: 1px solid #e5e5e5; }
+.fw .ub .p { flex: 1; background: #e8e8e8; border-radius: 14px; padding: 6px 12px; font-size: 12px; color: #666; display: flex; align-items: center; gap: 5px; }
+.fw .ub i { font-size: 17px; color: #555; }
+.fw .an { background: #b8d2bd; color: #8a1d1d; font-size: 12px; font-weight: 600; text-align: center; padding: 7px 14px; }
+.fw .hd { position: sticky; top: 0; z-index: 5; display: grid; grid-template-columns: 1fr auto auto auto auto; gap: 24px; padding: 22px 24px; align-items: center; border-bottom: 1px solid #e5e5e5; background: #fff; }
+.fw .hd.compact { padding: 12px 16px; gap: 14px; }
+.fw .wm { font-family: 'Times New Roman', Georgia, serif; font-size: 30px; line-height: 1.05; letter-spacing: 1.5px; color: #000; }
+.fw .hd.compact .wm { font-size: 19px; line-height: 1.1; letter-spacing: 1px; white-space: nowrap; }
+.fw .hd i { font-size: 28px; color: #000; }
+.fw .hd.compact i { font-size: 22px; }
+/* page-level classes (see source widget files for the full set) */
+.fw .atc.navy { background: #1F2A44; height: 52px; font-size: 16px; }
+.fw .reass { background: #fafaf6; border-top: 1px solid #ece8df; border-bottom: 1px solid #ece8df; padding: 14px 18px; }
+.fw .sticky { position: sticky; bottom: 0; background: #efebe2; padding: 22px; display: none; gap: 18px; align-items: center; z-index: 10; box-shadow: 0 -3px 8px rgba(0,0,0,0.08); }
+.fw .sticky.visible { display: flex; }
+.fw .sticky.navy { background: #1F2A44; padding: 16px 18px; }
+.fw .footer-trust { padding: 22px 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; border-bottom: 1px solid #d8d4cb; background: #ece8df; }
+.fw .shopby-cat { padding: 14px 0 16px; background: #fff; border-bottom: 1px solid #eee; }
+.fw .shopby-title { font:500 9px/1 'Inter',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:#444; margin-bottom:7px; padding: 0 18px; }
+.fw .shopby-cards { display: flex; gap: 10px; padding: 0 18px; overflow-x: auto; scroll-snap-type: x mandatory; }
+.fw .shopby-cards::-webkit-scrollbar { height: 4px; }
+.fw .shopby-card { flex-shrink: 0; width: 96px; scroll-snap-align: start; }
+.fw .shopby-img { width: 96px; height: 96px; border: 0.5px solid #c0bcb3; }
+.fw .shopby-lbl { font:500 12.5px/1.2 'Inter',sans-serif; color:#1a1a1a; text-align:center; padding-top: 8px; letter-spacing:.02em; }
+</style>
+
+<h2 class="sr-only">{{CLIENT_NAME}} CRO prototype — toggle each recommendation independently across PDP, PLP, category landing, and homepage.</h2>
+
+<div class="fw">
+  <div class="tabs" id="fw-tabs">
+    <button class="tab active" data-page="pdpA">PDP &mdash; mixed swatches</button>
+    <button class="tab" data-page="pdpB">PDP &mdash; huge stack</button>
+    <button class="tab" data-page="pdpC">PDP &mdash; dropdowns</button>
+    <button class="tab" data-page="plp">PLP</button>
+    <button class="tab" data-page="cat">Category landing</button>
+    <button class="tab" data-page="home">Homepage</button>
+  </div>
+  <div class="controls" id="fw-controls"></div>
+  <div class="stage">
+    <div class="phone-wrap">
+      <div class="phone">
+        <div class="chrome">
+          <div class="ub"><i class="ti ti-home-2"></i><span class="p"><i class="ti ti-shield-check" style="font-size:14px"></i>{{CLIENT_URL}}</span><i class="ti ti-player-play"></i><i class="ti ti-square"></i><i class="ti ti-dots-vertical"></i></div>
+        </div>
+        <div class="scroll" id="fw-scroll"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/*
+  WIDGET BODY — replace placeholders below before rendering:
+
+  var allRecs = {{REC_LIST_JSON}};  // e.g. {r3: {label: '#3 Reassurance strip', applies: ['pdpA','pdpB','pdpC']}, ...}
+  var productTypes = {{PRODUCT_TYPES_JSON}};  // e.g. [{l: 'Sheets', g: 'linear-gradient(...)'}, ...]
+
+  Page-render functions to implement:
+    pdpA(), pdpB(), pdpC(), plp(), cat(), home()
+    Each returns full HTML string from header() through footerSection().
+
+  Shared helpers:
+    header()           // serif wordmark, announcement, icons; compacts when r4 is on
+    pdpHead(...)       // brand, title, rating, why-fig, price, ship-line
+    atcBlock(), atcCls()
+    reassuranceStrip() // r3
+    stickyBar(name,price)  // bottom popup with two variants (old red / new slim)
+    deliveryAcc, shareRow, bundleSection, descOpen, reviewsBlock(), paymentSection, youMayAlsoLike, btt(), footerSection()
+    shopByCategoryRail()  // product-type horizontal rail, r15
+    plpCard(...)
+    setupStickyObserver()  // IntersectionObserver wiring delivery + footer + sticky popup
+
+  Render flow:
+    state = {page: 'pdpA', r3: false, r4: false, ...}
+    applicableRecs() filters allRecs by current page
+    renderControls() rebuilds pill row
+    renderAll() rebuilds scrollEl.innerHTML from getPage(); calls setupStickyObserver()
+
+  Source file with full working implementation:
+    uploads/fig_linens_single_atc.html
+*/
+</script>
