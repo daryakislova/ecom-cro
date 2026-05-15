@@ -1,18 +1,18 @@
 ---
 name: cro-deck
-description: Build a CRO recommendation deck end-to-end — from client brief to a ready-for-Claude-Design output package.
+description: Build a CRO recommendation package end-to-end — from client brief to an interactive HTML prototype with toggleable recs plus an implementation-tracker XLSX. No .pptx output.
 ---
 
-# /cro-deck — CRO Deck Workflow
+# /cro-deck — Interactive CRO Prototype Workflow
 
-You are producing a CRO recommendation deck for an ecom client. Walk through this workflow step by step. Do not skip steps. Do not run them out of order. After each step, briefly confirm to the user what was done before continuing.
+You are producing a CRO recommendation package for an ecom client. The deliverables are two files: an interactive HTML prototype + an implementation-tracker XLSX (NOT a .pptx deck). Walk through this workflow step by step. Do not skip steps. Do not run them out of order. After each step, briefly confirm to the user what was done before continuing.
 
 **Hard constraints (apply throughout):**
 
 - This is for an ecom client. PDPs and PLPs are the most leveraged pages. Cart drawer matters. Standard Shopify checkout is low-leverage; only audit it deeply if the user flagged Shopify Plus + Checkout Extensibility, or asks for it.
 - Mobile-first by default unless the user picks web in Step 2.
 - The plugin ships with NO brand assets — every run, you ask the user to provide (or describe) their style. Then you save a per-client style profile to `outputs/<client-slug>/style-profile.json` and treat it as law for the rest of that run.
-- **The primary deliverable is an interactive HTML prototype** (`prototype.html`) that recreates the client's current site at near-1:1 fidelity with toggleable rec controls. The user can share this URL directly with the client. The `.pptx` is an optional follow-on artifact via Claude Design hand-off; previous attempts with Claude Design have consistently failed at photoreal mockup synthesis, so HTML is preferred.
+- **The deliverables are two files: an interactive HTML prototype** (`prototype.html`) that recreates the client's current site at near-1:1 fidelity with toggleable rec controls, **and an implementation-tracker spreadsheet** (`implementation-tracker.xlsx`) that the client uses to manage rollout. The user shares both directly with the client. No `.pptx` — it is not produced by this workflow.
 - Every recommendation must cite at least one heuristic by name from the `cro-heuristics` skill. Read it before generating recs.
 
 All output files for one deck go to `outputs/<client-slug>/` where `<client-slug>` is the client name in lowercase with hyphens.
@@ -372,7 +372,7 @@ Ask: "Approve this list, or want to drop / edit / add any?" Wait for explicit ap
 
 Build a single-file HTML interactive prototype that recreates the client's current key pages (PDP, PLP, category landing, homepage, footer) at near-1:1 fidelity, with toggleable rec controls. The user can flip each rec on/off and watch the design compound toward the Suggested state.
 
-This artifact replaces the static "Current + Suggested screenshot pair" pattern that consistently fails downstream. It is the primary deliverable.
+This artifact, paired with the XLSX tracker from Step 7, is the deliverable. There is no .pptx output.
 
 ### Templates to start from
 
@@ -452,9 +452,34 @@ The `suggested_view_setup` is for the isolated demonstration of that single rec.
 
 ### 6.3 — Recommended UI layout for the prototype
 
-- Top of widget: tab row for page selection (PDP A / PDP B / PLP / Cat landing / Homepage / etc.)
-- Below tabs: control panel listing the toggles applicable to the current page. Each toggle is a labeled pill with a state dot. "Reset all" and "Apply all" buttons. Counter "N / Total on".
-- Below controls: the phone frame, ~420px wide, with a fixed chrome and scrollable inner content area. Re-renders on every toggle change.
+- **Top of widget:** tab row for page selection (PDP A / PDP B / PLP / Cat landing / Homepage / etc.). For single-page prototypes (just one canvas), skip the tab row entirely.
+- **Below tabs:** control panel listing the recs applicable to the current page (filtered by `applies_to_pages`), in **page-position order** — the rec whose targeted element sits highest on the page is rec #1 on that panel; the rec whose element sits lowest is the last. Future-build / Gamechanger recs (if any) are always placed at the END of the order, regardless of where their element sits on the page. Each rec is rendered as a **detailed card** (not a simple pill) — see 6.3.1 below.
+- **Above the rec list:** a sticky summary bar showing `Recommendations · X / Y on` for the current tab. Top-right of the summary bar: `Defaults` button (restores the per-tab default-on set), `Reset all` button (turns every rec OFF).
+- **Below controls:** the phone frame, ~420px wide (or `.desktop-wrap` if desktop target), with a fixed chrome and scrollable inner content area. Re-renders on every toggle change.
+
+### 6.3.1 — Rec card spec (the rail)
+
+Each rec card in the rail must include all of the following, in this order top-to-bottom:
+
+- **Header row:**
+  - `Number` — the rec's global index. Numbers do NOT renumber between page tabs — a rec keeps the same number across every page-tab it appears in.
+  - `Title` — short, bold, 1 line. Prefix with `★ ` for Gamechanger / `future_build: true` recs.
+  - `Future-build badge` (right-aligned) — a small "Future build" pill, only rendered for `future_build: true` recs.
+  - `Toggle switch` (right-aligned) — small pill (30×18px). ON state uses `rec_toggle_on_color` from the style profile (default `#7c5cff`). Gamechanger / future-build cards use `gamechanger_toggle_on_color` (default `#d4a500`, gold) when ON, so they read as distinct bets.
+- **Brief** — 1–2 sentence description of the change (`recommendation` field, verbatim).
+- **Why line** — thin top divider, then `Why:` label followed by the heuristic + audience signal in one sentence (`why` field, verbatim).
+- **"As seen on" line** — thin top divider, then `As seen on:` followed by comma-separated competitor citations. Each citation is the competitor domain, rendered as a clickable link (`target="_blank"`) to the specific URL where that pattern is visible. Source: the rec's `competitor_pattern_observed` URL(s) collected in Step 4b. For `differentiation` recs (no competitor pattern), write `Differentiation — no direct competitor pattern` and optionally a closest-analog citation.
+
+The whole card is clickable — clicking anywhere on the card flips the toggle.
+
+Visual style (override only if the user explicitly asks):
+- Rec card: white background, 0.5px `#e0e0e0` border, 8px radius, 11px 13px padding.
+- Rec card ON: light tint of `rec_toggle_on_color` for background, full color for border.
+- Gamechanger card ON: light gold tint background, gold border.
+- Future-build card: dashed border (so it reads as visually distinct in the rail even when OFF).
+- Title: 13px 600 weight. Brief: 11.5px regular `#555`. Why line: 11px `#888`. "As seen on" line: 10.5px italic `#888`, links in `rec_toggle_on_color`.
+
+Do NOT put impact metrics, expected lift, supporting stat, or ICE scores in the rec card itself — those live in the XLSX (Step 7) and in the per-rec text export (Step 9). The card is for quick scanning; the XLSX is the working document.
 
 ### 6.4 — Fidelity standards
 
@@ -482,184 +507,113 @@ The prototype must be honest. Older audiences and clients reviewing the deck nee
 
 ---
 
-## Step 7 — Write the deck brief
+## Step 7 — Build implementation-tracker XLSX
 
-Read the per-client `outputs/<client-slug>/style-profile.json` from Step 0 and embed its rules verbatim into the brief. Generate three files in `outputs/<client-slug>/`:
+Generate a companion spreadsheet at `outputs/<client-slug>/implementation-tracker.xlsx` so the client can manage rollout. Use the `xlsx` skill to build it.
 
-### File 1 — `deck-brief.md`
+### 7.1 Sheet structure
 
-Use the template below. Replace all `{{TOKENS}}` with real values. Embed the style profile rules verbatim (do not paraphrase).
+ONE sheet named "Recommendations" — one row per approved rec, in **rec-number order** (same numbering as the HTML prototype). Future-build / Gamechanger recs are at the end of the list.
 
-```markdown
-# CRO Deck Brief — {{CLIENT_NAME}}
+Columns, in this exact order:
 
-**Date:** {{DATE_YYYY_MM_DD}}
-**Client URL:** {{CLIENT_URL}}
-**Audience summary:** {{AUDIENCE_ONE_LINE}}
-**Total recs:** {{TOTAL_N}} ({{UI_UX_COUNT}} UI/UX + {{STRATEGIC_COUNT}} Strategic)
+| # | Column | Type | Notes |
+|---|---|---|---|
+| 1 | **#** | integer | The rec number — matches the prototype rail. Freeze this column on the left. |
+| 2 | **Recommendation** | string | A terse 1–5 word label. NOT the full one-sentence recommendation — that goes in `Details`. Examples: "Sticky ATC", "Trust badges", "Cadence visualization". |
+| 3 | **Details** | string | The full `recommendation` sentence from the rec metadata. Wrap text. |
+| 4 | **Category** | string | UI/UX · Strategic · Gamechanger. |
+| 5 | **Page** | string | PDP · PLP · Cart · Homepage · Category · Other. Derived from `page_type_affected`. |
+| 6 | **Impact** | integer 1–10 | From `ice.impact`. |
+| 7 | **Confidence** | integer 1–10 | From `ice.confidence`. |
+| 8 | **Ease** | integer 1–10 | From `ice.ease`. |
+| 9 | **ICE Total** | integer | From `ice.total` (impact × confidence × ease). Apply a 3-color conditional-formatting scale: red (low) → yellow → green (high). |
+| 10 | **Priority** | string | High / Medium / Low — derived from ICE Total quartiles within this deck. Top 25% = High; middle 50% = Medium; bottom 25% = Low. |
+| 11 | **Risk** | string | "Ship" / "Test" / "Research-first" — directly from the feasibility classification in Step 4c. Color-coded cell: Ship = green tint, Test = amber tint, Research-first = grey tint. |
+| 12 | **Implementation Status** | string | Dropdown with these values, in this order: `Not started` (default for every row), `Shared with client`, `Awaiting decision`, `Approved`, `In progress`, `Implemented`, `A/B testing`, `Won (kept)`, `Lost (rolled back)`, `Inconclusive`, `Dropped`. Apply data validation to enforce the dropdown. Color-code: Implemented / Won = green tint; In progress / A/B testing = amber tint; Dropped / Lost = grey tint; Not started = no fill. |
+| 13 | **Implementation Date** | date | Blank by default. Format: `YYYY-MM-DD`. Apply date validation. |
+| 14 | **Owner** | string | Who owns the implementation (e.g. "Client design team", "Client dev", "Agency"). Blank by default. |
+| 15 | **Comment** | string | Free-text. For agency or client to note feedback, blockers, test results. Wrap text; column width ~60 chars. |
 
----
+### 7.2 Sheet formatting
 
-## Style rules — LAW
+- Header row: bold, white text, dark fill matching `colors.primary` from `style-profile.json` (fall back to `#1a1a1a` if none).
+- Freeze first row + first column.
+- Body: `font-family: Inter, Arial, sans-serif`, 11pt.
+- Auto-fit column widths with manual caps: Details = 45 chars, Comment = 60 chars (wrap text).
+- Zebra striping on data rows (light grey alternate).
+- ICE Total: 3-color scale conditional formatting.
+- Risk and Implementation Status: cell-fill color coding per the values above.
 
-<embed the contents of style-profile.json here, formatted as readable markdown sections>
+### 7.3 Optional Summary sheet
 
-### Mockup rules for "after" / Suggested screens — CRITICAL
+If the deck has 10+ recs, add a second sheet named "Summary" with:
 
-Keep the original screenshot pristine. On the "after" version, modify ONLY the targeted element via overlay or composition. Every other element of the UI must remain visually identical — same fonts, colors, spacing, surrounding sections, header, footer, padding, status bar, scroll position. The targeted element must remain visible and clearly the focus.
+- Total rec count broken down by category (UI/UX / Strategic / Gamechanger)
+- Distribution by Risk (Ship / Test / Research-first counts)
+- Distribution by Page (counts per page type)
+- Average ICE score
+- A bar chart of ICE Total per rec (chart inside the sheet, not a separate image)
 
-DO NOT:
-- Regenerate the entire UI from scratch
-- Change unrelated colors or fonts
-- Reflow surrounding layout
-- Add or remove unrelated elements
-- Use a different device frame from the "before" shot
+Keep the Summary sheet minimal — Recommendations is the working document; Summary is a one-glance health-check.
 
-PREFERRED METHODS:
-- Crop + overlay the changed element on top of the original
-- Inpaint only the affected region
-- Replace a single component (e.g. a button, a section, a label) and keep everything around it
+### 7.4 Quality gate before saving
 
-### Competitor reference
-
-Per slide: small thumbnail or inset showing a competitor implementing the recommended pattern, with caption "as seen on {{competitor.com}}" in 10pt body color. Position: bottom-right of the right zone, OR small inline thumbnail below the Suggested screen.
-
----
-
-## Deck flow
-
-Per style profile: <state whether cover slide is included or not>
-
-1. Contents
-2. Section divider: "UI/UX Recommendation"
-3. UI/UX rec slides
-4. Section divider: "Strategic Recommendation"
-5. Strategic rec slides
-6. Closing: sources + comments link
-
----
-
-## Slide 1 — Contents
-
-Title: "Contents". Two-line list:
-- UI/UX Recommendations  ........  p. 2
-- Strategic Recommendations  ......  p. {{STRATEGIC_DIVIDER_PAGE}}
-
-## Slide 2 — Section divider: UI/UX Recommendation
-
-Large centered title "UI/UX Recommendation" per style profile. "Back to Contents" link bottom-left.
-
-## Slide N — Recommendation slide template
-
-For each rec, render this layout:
-
-- **Header bar (if style profile uses one):** full-width per style profile; title "Website Recommendation" left-aligned, white bold
-- **Left rail (~3.5" wide, x=0.16"):**
-  - **Recommendation:** {{recommendation}}
-  - **Why:** {{why}}
-  - **Impact:**
-    - {{impact_metric_1}}
-    - {{impact_metric_2}}
-  - **Expected lift:** {{expected_lift}}
-  - **Supporting stat:** "{{stat}}" — [{{source}}]({{source_url}}) (omit if null)
-- **Right zone:**
-  - "Current" label (red, bold) and "Suggested" label (green, bold) above the two phone frames
-  - Vertical dashed separator between the two sides
-  - Phone frames: iPhone 16 Pro aspect (~1.95" × 4.3"), thin device frame
-  - **Current** = screenshot of `prototype.html`, page tab from `prototype-rec-map.json[rec].suggested_view_setup.page_tab`, all toggles OFF
-  - **Suggested** = screenshot of `prototype.html`, same page tab, with toggles from `prototype-rec-map.json[rec].compounded_view_setup.toggles_on` flipped ON (this is the compounded view — by slide N, the Suggested has this rec PLUS all prior recs visible together)
-  - Layout type: symmetric | additive-only | removal-only
-  - Competitor reference (optional): small inset thumbnail with caption "as seen on {{competitor.com}}" if a competitor implements the pattern visibly
-- **Page number:** bottom-right per style profile
-
-<repeat for every rec, in deck order>
-
-## Closing slide
-
-Title: "Websites used for the examples"
-
-List every unique competitor URL referenced.
-
-Footer line: "Share your thoughts, comments, and implementation plans in this spreadsheet — [{{COMMENTS_LINK_TEXT}}]({{COMMENTS_LINK_URL}})"
-```
-
-### File 2 — `claude-design-prompt.txt`
-
-```
-I'm handing off a CRO deck for {{CLIENT_NAME}}. Please produce the .pptx following deck-brief.md exactly.
-
-Attached:
-- deck-brief.md — master instructions, including embedded style rules and per-slide content
-- prototype.html — interactive HTML prototype recreating the client's current site with rec toggles. This is the source of truth for every Current and Suggested screen — do NOT regenerate or mockup anything from scratch.
-- prototype-rec-map.json — per-rec mapping of which prototype page tab + which toggles to flip ON for each rec's Current and Suggested view
-- recommendations-validated.json — full structured rec data
-- style-profile.json — visual style law
-- (optional) logo or other brand assets
-
-Critical rules:
-1. The style profile embedded in deck-brief.md is law — do not deviate.
-2. For each slide, screenshot the prototype with the specified toggle states (per prototype-rec-map.json):
-   - Current = the prototype page tab, all toggles OFF
-   - Suggested = the same page tab, with this rec's compounded_view_setup.toggles_on flipped ON
-3. Compose the two screenshots into the slide's right zone with Current/Suggested labels and dashed separator.
-4. Do NOT redraw or regenerate UI. Use only the prototype's rendered output as the visual source.
-5. For purely additive recs, you may show only the Suggested side. For removal recs, only the Current side.
-6. Font: install the brand font (per style profile) on the build environment before generating. If embedding fails, fall back to Helvetica Neue or Calibri. NEVER Arial.
-7. The closing slide lists all competitor URLs referenced in the rec spec + the comments/feedback link.
-
-Output: a single .pptx file named "{{CLIENT_NAME}} _ Website Recommendations.pptx".
-
-Before finalizing, do a visual QA pass: render every slide as an image and check for left-rail text overflow, mis-aligned columns, broken page numbers, font fallback to Arial, and any prototype screenshots that show the wrong toggle state for the slide.
-```
-
-**Alternative (recommended):** the user may choose to skip the .pptx entirely and share `prototype.html` directly with the client. The HTML is a more honest, more interactive artifact than any static deck. Tell the user this option in Step 8.
-
-### File 3 — `metadata.json`
-
-Full structured rec data (every field from Step 3 + validator labels from Step 4) for traceability and future reuse.
-
-### Quality gate before delivery
-
-- All files present in `outputs/<client-slug>/`: `prototype.html`, `prototype-rec-map.json`, `deck-brief.md`, `claude-design-prompt.txt`, `metadata.json`, `recommendations-validated.json`, `style-profile.json`
-- Every rec slide schema is filled (no nulls in required fields)
-- Every rec in `prototype-rec-map.json` has a `toggle_key`, `suggested_view_setup`, and `compounded_view_setup`
-- `prototype.html` opens cleanly in a browser, all tabs render, all toggles work, "Apply all" produces a coherent Suggested state per page
-- Sources / closing slide in the brief lists every competitor URL referenced
-- Style rules section is pasted from `style-profile.json` (not paraphrased)
-- Page numbers are sequential
-- The prototype and deck reflect the user's own brand from Step 0
+- Row count = approved rec count, no extras, no blanks.
+- Implementation Status defaults to "Not started" on every row.
+- Implementation Date is blank on every row (the client fills it in over time).
+- All ICE columns are integers, not strings.
+- The Recommendation column is terse (max ~5 words). If you wrote the full sentence there by mistake, rewrite it to the short label and move the sentence to Details.
+- File opens cleanly in Excel, Google Sheets, and Numbers.
 
 ---
 
 ## Step 8 — Hand-off
 
-Present the user with both delivery paths and let them choose.
+Deliver both files directly to the user. No .pptx is produced — the HTML prototype IS the deliverable, and the XLSX is the working document for the client to manage rollout.
 
-**Path A (recommended) — share the HTML prototype directly with the client:**
+1. Provide `computer://` links to both files:
+   - `outputs/<client-slug>/prototype.html` — the interactive prototype
+   - `outputs/<client-slug>/implementation-tracker.xlsx` — the implementation tracker
+2. Tell the user how to share them: "Download both files from the links. The HTML opens in any browser on any device — attach to email or drop into Slack. The XLSX is the client's working document for tracking rollout status."
+3. Offer a short client-facing email template (~5 lines) they can adapt:
 
-1. Open the output folder (provide `computer://` link).
-2. Tell the user the primary deliverable is `prototype.html`. They can:
-   - Open it in a browser to verify it looks right
-   - Share the file directly with the client, OR
-   - Host it via any static-file host (or just open from local) and share the URL
-3. Pair it with `recommendations-validated.json` (or convert to Notion / Google Doc) for the per-rec "why" content the deck would have shown in the left rail.
-4. Optional: walk the client through the toggles on a call so they can see the Current → Suggested transition live.
+   > Hi all,
+   >
+   > Given the [metric trend / context], we took another pass at the [page / site] to find areas to sharpen the communication, raise perceived value, and improve conversion.
+   >
+   > Attached are two files:
+   >
+   > - **The interactive prototype** (.html) — please download and open in your browser. It recreates your current site with toggleable recommendations in the left rail; flip each rec on/off to see the page update live. Multiple page tabs at the top cover the PDP / PLP / homepage / etc.
+   > - **The implementation tracker** (.xlsx) — a working spreadsheet to manage rollout. Every rec is pre-filled with ICE scores, risk (Ship vs Test), and an Implementation Status dropdown. Update it as decisions are made; we'll review periodically together.
+   >
+   > A quick caveat: the prototype is directional — won't match production design 100%. It communicates intent, not final pixels.
+   >
+   > Let us know which ones are feasible to ship and if anything raises questions. Happy to jump on a call to walk through it together.
 
-This is the strongest deliverable. It's honest (no fake mockups), interactive (better than static slides), and recreate-able by anyone who opens the file. Previous CRO deck attempts via Claude Design have failed at photoreal mockup synthesis; the HTML prototype solves that by being the artifact itself.
+4. Offer to iterate: "Want to add, drop, or rephrase any recs? Adjust the prototype defaults? Recolor anything in the XLSX?"
 
-**Path B (optional) — produce a .pptx via Claude Design:**
+### Final quality gate
 
-If the client expects a static deck:
+Before declaring done:
 
-1. Open the output folder.
-2. Start a new Claude Design session.
-3. Attach: `prototype.html`, `prototype-rec-map.json`, `deck-brief.md`, `recommendations-validated.json`, `style-profile.json`, any brand assets.
-4. Paste the contents of `claude-design-prompt.txt`.
-5. Claude Design opens the prototype, screenshots each toggle state per `prototype-rec-map.json`, and composes the .pptx.
+**HTML prototype**
 
-Note: Claude Design's reliability on this workflow has been mixed. If it fails, fall back to manually screenshotting the prototype toggle states and assembling a deck in PowerPoint/Keynote (about an hour of work for 12–15 recs).
+- The HTML file exists at the expected path and opens cleanly in a browser
+- Every rec card has full metadata (number, title, brief, why, as seen on, toggle, future-build badge if applicable)
+- Every toggle visibly changes the targeted element
+- Every page tab applies its defaults correctly; counter is accurate
+- No fabricated content — every product name, price, USP, review count is from the audit
+- No icon-font CDN dependencies (inline SVG only — Tabler/FontAwesome CDNs have failed in the past)
+- File size is reasonable (<500KB; if larger, you've over-embedded — trim)
 
-Provide the `computer://` link to the output folder so the user can pick a path.
+**XLSX tracker**
+
+- The XLSX file exists at the expected path and opens cleanly in Excel + Google Sheets
+- Row count = approved rec count, in the same numbering as the prototype
+- Implementation Status defaults to "Not started" everywhere
+- Recommendation column is terse (1–5 words); full sentence is in Details
+- Dropdown validation applies to Status; conditional formatting applies to ICE Total + Risk + Status
 
 ---
 
@@ -681,7 +635,7 @@ Format and paste the rec text into the chat response. Use this when:
 Format per rec:
 
 ```
-**Slide N — [Title]**
+**Rec N — [Title]**
 
 **Recommendation**
 [recommendation field — full prose]
@@ -720,15 +674,15 @@ File structure:
 
 ## Section 1 — UI/UX Recommendations
 
-### Slide 1 — [Title]
+### Rec 1 — [Title]
 [full per-rec block, same format as Mode A but without the surrounding bolding cues]
 
-### Slide 2 — [Title]
+### Rec 2 — [Title]
 ...
 
 ## Section 2 — Strategic Recommendations
 
-### Slide N — [Title]
+### Rec N — [Title]
 ...
 
 ## Sources
@@ -744,7 +698,7 @@ After writing, share `computer://` link to `recommendations.md`.
 Default to asking the user explicitly: "Do you want the rec text in chat, or saved to a file you can open?" One short clarifying question saves wasted output.
 
 If they ask for "all recs" / "the full list" / "a document," default to Mode B (file).
-If they ask for "the copy for slide N" / "rec X text" / "send me," default to Mode A (chat).
+If they ask for "the copy for rec N" / "rec X text" / "send me," default to Mode A (chat).
 
 ### Source of truth
 

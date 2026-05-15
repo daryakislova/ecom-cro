@@ -1,12 +1,21 @@
 {
   "name": "ecom-cro",
-  "version": "0.5.0",
-  "description": "Build a CRO recommendation package end-to-end. Parses a client brief, audits the website (DOM-first via live browser, screenshots only as fallback), generates ICE-scored audience-aligned recommendations grounded in UX heuristics, validates feasibility, then builds an interactive HTML prototype recreating the client's site with per-rec toggles — plus optional deck handoff package. v0.5 adds on-demand per-rec text export (to chat or recommendations.md file). v0.4 added reusable widget templates and a popup-copy skill tuned for luxury 45+ audiences. Brand-neutral — asks each user for their own style at runtime.",
+  "version": "0.6.0",
+  "description": "Build a CRO recommendation package end-to-end. Parses a client brief, audits the website (DOM-first via live browser, screenshots only as fallback), generates ICE-scored audience-aligned recommendations grounded in UX heuristics, validates feasibility, then builds an interactive HTML prototype recreating the client's site with per-rec toggles (rec card includes brief / why / as seen on, ordered top-to-bottom by page position) — plus an implementation-tracker XLSX (Recommendation, ICE breakdown, Risk, Status dropdown, Date, Comment). v0.6 drops .pptx output entirely (HTML + XLSX are the only deliverables) and adds detailed rec cards + page-position ordering + the XLSX step. v0.5 added on-demand per-rec text export. v0.4 added reusable widget templates and a popup-copy skill tuned for luxury 45+ audiences. Brand-neutral — asks each user for their own style at runtime.",
   "author": {
     "name": "daryakislova"
   },
   "homepage": "https://github.com/daryakislova/ecom-cro",
   "repository": "https://github.com/daryakislova/ecom-cro",
   "license": "UNLICENSED",
-  "keywords": ["cro", "conversion-rate-optimization", "ecommerce", "ux", "deck", "recommendations"]
+  "keywords": [
+    "cro",
+    "conversion-rate-optimization",
+    "ecommerce",
+    "ux",
+    "deck",
+    "recommendations",
+    "tracker",
+    "prototype"
+  ]
 }
